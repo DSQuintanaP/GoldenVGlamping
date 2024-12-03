@@ -136,7 +136,7 @@ namespace GoldenV.Controllers
                 };
 
                 // Obtener los servicios seleccionados y sumar sus precios
-                decimal totalServicios = 0;
+                decimal totalServicios;
                 foreach (var servicioId in ServiciosSeleccionados)
                 {
                     var servicio = await _context.Servicios.FindAsync(servicioId);
