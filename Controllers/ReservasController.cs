@@ -31,26 +31,26 @@ namespace GoldenV.Controllers
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
-        // GET: Reservas/Details/5
-        public async Task<IActionResult> Detalles(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
+        //// GET: Reservas/Details/5
+        //public async Task<IActionResult> Detalles(int? id)
+        //{
+        //    if (id == null)
+        //    {
+        //        return NotFound();
+        //    }
 
-            var reserva = await _context.Reservas
-                .Include(r => r.IdClienteNavigation)
-                .Include(r => r.IdEstadoReservaNavigation)
-                .Include(r => r.MetodoPagoNavigation)
-                .FirstOrDefaultAsync(m => m.IdReserva == id);
-            if (reserva == null)
-            {
-                return NotFound();
-            }
+        //    var reserva = await _context.Reservas
+        //        .Include(r => r.IdClienteNavigation)
+        //        .Include(r => r.IdEstadoReservaNavigation)
+        //        .Include(r => r.MetodoPagoNavigation)
+        //        .FirstOrDefaultAsync(m => m.IdReserva == id);
+        //    if (reserva == null)
+        //    {
+        //        return NotFound();
+        //    }
 
-            return View(reserva);
-        }
+        //    return View(reserva);
+        //}
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -94,42 +94,163 @@ namespace GoldenV.Controllers
         }
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
-        // GET: Reservas/Create
-        public IActionResult Create()
+        //// GET: Reservas/Create
+        //public IActionResult Creacion()
+        //{
+        //    ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente");
+        //    ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva");
+        //    ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago");
+        //    return View();
+        //}
+
+        //// POST: Reservas/Create
+        //// To protect from overposting attacks, enable the specific properties you want to bind to.
+        //// For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        //[HttpPost]
+        //[ValidateAntiForgeryToken]
+        //public async Task<IActionResult> Creacion([Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
+        //{
+        //    if (ModelState.IsValid)
+        //    {
+        //        _context.Add(reserva);
+        //        await _context.SaveChangesAsync();
+        //        return RedirectToAction(nameof(Index));
+        //    }
+        //    ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente", reserva.IdCliente);
+        //    ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva", reserva.IdEstadoReserva);
+        //    ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago", reserva.MetodoPago);
+        //    return View(reserva);
+        //}
+
+        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
+        public async Task<IActionResult> Create()
         {
-            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente");
-            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva");
-            ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago");
+            CargarDatosVista(); // Cargar clientes, métodos de pago y estados de reserva
+
+            // Cargar los paquetes disponibles con Id, Nombre y Precio
+            var paquetes = await _context.Paquetes
+                .Select(p => new { p.IdPaquete, p.NomPaquete, p.Costo })
+                .ToListAsync();
+
+            ViewBag.IdPaquete = new SelectList(paquetes, "IdPaquete", "Nombre");
+            ViewBag.Paquetes = paquetes; // Pasar paquetes para uso en JavaScript
+
+            // Cargar los servicios disponibles con Id, Nombre y Precio
+            var servicios = await _context.Servicios
+                .Select(s => new { s.IdServicio, s.NomServicio, s.Costo })
+                .ToListAsync();
+
+            ViewBag.Servicios = servicios; // Pasar servicios a la vista
+
+            var clientes = await _context.Clientes
+                .Select(c => new { c.IdCliente, ClienteInfo = $"{c.Nombres} {c.Apellidos}" })
+                .ToListAsync();
+
+            ViewBag.IdCliente = new SelectList(clientes, "IdCliente", "ClienteInfo");
+
             return View();
         }
 
-        // POST: Reservas/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
+        public async Task<IActionResult> Create([Bind("IdReserva,FechaReserva,FechaInicio,FechaFin,Subtotal,Iva,Total,NoPersonas,IdCliente,IdUsuario,IdEstadoReserva,IdMetodoPago,Descuento")] Reserva reserva, int IdPaquete, List<int> ServiciosSeleccionados)
         {
             if (ModelState.IsValid)
             {
+                // Asignar el IdPaquete a la entidad Reserva
+                reserva.IdPaquete = IdPaquete;
+
+                // Obtener el paquete seleccionado y su precio
+                var paquete = await _context.Paquetes.FindAsync(IdPaquete);
+                if (paquete == null)
+                {
+                    ModelState.AddModelError("IdPaquete", "El paquete seleccionado no existe.");
+                    CargarDatosVista();
+                    return View(reserva);
+                }
+
+                // Crear el detalle del paquete asociado a la reserva
+                var detallePaquete = new DetallePaquete
+                {
+                    IdPaquete = paquete.IdPaquete,
+                    Precio = paquete.Costo,
+                    Estado = true
+                };
+
+                // Obtener los servicios seleccionados y sumar sus precios
+                decimal totalServicios = 0;
+                foreach (var servicioId in ServiciosSeleccionados)
+                {
+                    var servicio = await _context.Servicios.FindAsync(servicioId);
+                    if (servicio != null)
+                    {
+                        reserva.DetalleServicios.Add(new DetalleServicio
+                        {
+                            IdServicio = servicio.IdServicio,
+                            Precio = servicio.Costo,
+                            Estado = true,
+                            Cantidad = 1 // Ajustar según tus necesidades
+                        });
+                        totalServicios += servicio.Costo;
+                    }
+                }
+
+                // Calcular el subtotal con el precio del paquete y los servicios seleccionados
+                var subtotalConDescuento = (paquete.Costo + totalServicios) * (1 - reserva.Descuento / 100);
+                reserva.SubTotal = decimal.Round(subtotalConDescuento, 2, MidpointRounding.AwayFromZero);
+                reserva.Iva = decimal.Round(reserva.SubTotal * 0.19m, 2, MidpointRounding.AwayFromZero);
+                reserva.MontoTotal = decimal.Round(reserva.SubTotal + reserva.Iva, 2, MidpointRounding.AwayFromZero);
+
+                // Agregar el detalle del paquete a la colección de DetallePaquetes de la reserva
+                reserva.DetalleReservaPaquetes.Add(detallePaquete);
+
+                // Guardar la reserva junto con los detalles de paquete y servicios seleccionados
                 _context.Add(reserva);
                 await _context.SaveChangesAsync();
+
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente", reserva.IdCliente);
-            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva", reserva.IdEstadoReserva);
-            ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago", reserva.MetodoPago);
+
+            // Si el modelo no es válido, recargar los datos para la vista
+            CargarDatosVista();
             return View(reserva);
         }
 
-        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
+        public void CargarDatosVista()
+        {
+            // Cargar clientes disponibles
+            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "Nombre");
+
+            // Cargar métodos de pago disponibles
+            ViewData["IdMetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "Nombre");
+
+            // Cargar estados de reserva
+            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "Estados");
+
+            // Cargar usuarios disponibles (si es necesario)
+            ViewData["IdUsuario"] = new SelectList(_context.Usuarios, "IdUsuario", "Nombre");
+        }
+        public async Task<IActionResult> AgregarAbono(int id)
+        {
+            var reserva = await _context.Reservas.FindAsync(id);
+            if (reserva == null)
+            {
+                return NotFound();
+            }
+
+            // Crear un nuevo abono y asignar la reserva
+            var abono = new Abono { IdReserva = id, FechaAbono = DateTime.Now };
+            return View("CreateAbono", abono); // Asegúrate de pasar el modelo de Abono con el IdReserva
+        }
 
 
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
         // GET: Reservas/Edit/5
-        public async Task<IActionResult> Edit(int? id)
+        public async Task<IActionResult> Editar(int? id)
         {
             if (id == null)
             {
@@ -147,12 +268,65 @@ namespace GoldenV.Controllers
             return View(reserva);
         }
 
+        //// POST: Reservas/Edit/5
+        //// To protect from overposting attacks, enable the specific properties you want to bind to.
+        //// For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        //[HttpPost]
+        //[ValidateAntiForgeryToken]
+        //public async Task<IActionResult> Editar(int id, [Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
+        //{
+        //    if (id != reserva.IdReserva)
+        //    {
+        //        return NotFound();
+        //    }
+
+        //    if (ModelState.IsValid)
+        //    {
+        //        try
+        //        {
+        //            _context.Update(reserva);
+        //            await _context.SaveChangesAsync();
+        //        }
+        //        catch (DbUpdateConcurrencyException)
+        //        {
+        //            if (!ReservaExists(reserva.IdReserva))
+        //            {
+        //                return NotFound();
+        //            }
+        //            else
+        //            {
+        //                throw;
+        //            }
+        //        }
+        //        return RedirectToAction(nameof(Index));
+        //    }
+        //    ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente", reserva.IdCliente);
+        //    ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva", reserva.IdEstadoReserva);
+        //    ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago", reserva.MetodoPago);
+        //    return View(reserva);
+
+
+        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
+        // GET: Reservas/Edit/5
+        public async Task<IActionResult> Edit(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var reserva = await _context.Reservas.FindAsync(id);
+            if (reserva == null)
+            {
+                return NotFound();
+            }
+            return View(reserva);
+        }
         // POST: Reservas/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
+        public async Task<IActionResult> Edit(int id, [Bind("IdReserva,FechaReserva,FechaInicio,FechaFin,Subtotal,Iva,Total,Descuento")] Reserva reserva)
         {
             if (id != reserva.IdReserva)
             {
@@ -179,31 +353,67 @@ namespace GoldenV.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente", reserva.IdCliente);
-            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva", reserva.IdEstadoReserva);
-            ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago", reserva.MetodoPago);
             return View(reserva);
         }
 
+        private bool ReservaExists(int id)
+        {
+            return _context.Reservas.Any(e => e.IdReserva == id);
+        }
+
+
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
+        //// GET: Reservas/Delete/5
+        //public async Task<IActionResult> Delete(int? id)
+        //{
+        //    if (id == null)
+        //    {
+        //        return NotFound();
+        //    }
 
+        //    var reserva = await _context.Reservas
+        //        .Include(r => r.IdClienteNavigation)
+        //        .Include(r => r.IdEstadoReservaNavigation)
+        //        .Include(r => r.MetodoPagoNavigation)
+        //        .FirstOrDefaultAsync(m => m.IdReserva == id);
+        //    if (reserva == null)
+        //    {
+        //        return NotFound();
+        //    }
+
+        //    return View(reserva);
+        //}
+
+        //// POST: Reservas/Delete/5
+        //[HttpPost, ActionName("Delete")]
+        //[ValidateAntiForgeryToken]
+        //public async Task<IActionResult> DeleteConfirmed(int id)
+        //{
+        //    var reserva = await _context.Reservas.FindAsync(id);
+        //    if (reserva != null)
+        //    {
+        //        _context.Reservas.Remove(reserva);
+        //    }
+
+        //    await _context.SaveChangesAsync();
+        //    return RedirectToAction(nameof(Index));
+        //}
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
 
         // GET: Reservas/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
+            if (id == null || _context.Reservas == null)
             {
                 return NotFound();
             }
 
             var reserva = await _context.Reservas
-                .Include(r => r.IdClienteNavigation)
-                .Include(r => r.IdEstadoReservaNavigation)
-                .Include(r => r.MetodoPagoNavigation)
                 .FirstOrDefaultAsync(m => m.IdReserva == id);
+
             if (reserva == null)
             {
                 return NotFound();
@@ -218,24 +428,32 @@ namespace GoldenV.Controllers
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var reserva = await _context.Reservas.FindAsync(id);
+
             if (reserva != null)
             {
+                var detallesPaquetes = _context.DetallePaquetes.Where(dp => dp.IdReserva == id);
+                _context.DetallePaquetes.RemoveRange(detallesPaquetes);
+
+                var detallesServicios = _context.DetalleServicios.Where(ds => ds.IdReserva == id);
+                _context.DetalleServicios.RemoveRange(detallesServicios);
+
                 _context.Reservas.Remove(reserva);
+                await _context.SaveChangesAsync();
             }
 
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
+
+
+
+
+
+            /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
+            
         }
-
-        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-
-        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
-
-        private bool ReservaExists(int id)
-        {
-            return _context.Reservas.Any(e => e.IdReserva == id);
-        }
+        //private bool ReservaExists(int id)
+        //{
+        //    return _context.Reservas.Any(e => e.IdReserva == id);
+        //}
     }
 }
