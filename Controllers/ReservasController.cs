@@ -162,7 +162,7 @@ namespace GoldenV.Controllers
         {
             if (ModelState.IsValid)
             {
-                // Obtener los servicios seleccionados y sumar sus precios
+                // Obtener los paquetes seleccionados y sumar sus precios
                 decimal totalPaquetes = 0;
                 foreach (var PaqueteId in PaquetesSeleccionados)
                 {
@@ -204,6 +204,7 @@ namespace GoldenV.Controllers
 
                 // Agregar el detalle del paquete a la colección de DetallePaquetes de la reserva
                 reserva.DetalleReservaPaquetes.Add(DetalleReservaPaquete);
+                reserva.DetalleReservaPaquetes.Add(DetalleReservaServicio);
 
                 // Guardar la reserva junto con los detalles de paquete y servicios seleccionados
                 _context.Add(reserva);
