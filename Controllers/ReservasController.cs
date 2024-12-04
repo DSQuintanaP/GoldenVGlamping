@@ -22,14 +22,14 @@ namespace GoldenV.Controllers
         }
 
         // GET: Reservas
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Indice()/*--Viejo--Metodo-*/
         {
             var goldenVglampingContext = _context.Reservas.Include(r => r.IdClienteNavigation).Include(r => r.IdEstadoReservaNavigation).Include(r => r.MetodoPagoNavigation);
             return View(await goldenVglampingContext.ToListAsync());
         }
 
         // GET: Reservas/Details/5
-        public async Task<IActionResult> Details(int? id)
+        public async Task<IActionResult> Detalles(int? id) /*--Viejo--Metodo-*/
         {
             if (id == null)
             {
@@ -51,14 +51,18 @@ namespace GoldenV.Controllers
 
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
-        //// GET: Reservas/Create
-        //public IActionResult Create()
-        //{
-        //    ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente");
-        //    ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva");
-        //    ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago");
-        //    return View();
-        //}
+        // GET: Reservas/Details/5
+        public IActionResult Details(int id)/*--Nuevo--Metodo-*/
+        {
+            // Obtener la reserva con todos los detalles
+            var reserva = _context.Reservas
+                .Include(r => r.IdClienteNavigation)  // Incluir cliente                
+                .Include(r => r.IdEstadoReservaNavigation)  // Incluir estado de reserva
+                .Include(r => r.MetodoPagoNavigation)  // Incluir método de pago                
+                .Include(r => r.DetalleReservaPaquetes)  // Incluir detalles de paquetes
+                .Include(r => r.DetalleReservaServicios)  // Incluir detalles de servicios
+                .ThenInclude(ds => ds.IdServicioNavigation)  // Incluir servicios en detalles
+                .FirstOrDefault(r => r.IdReserva == id);
 
         //// POST: Reservas/Create
         //// To protect from overposting attacks, enable the specific properties you want to bind to.
@@ -93,25 +97,19 @@ namespace GoldenV.Controllers
             ViewBag.IdPaquete = new SelectList(paquetes, "IdPaquete", "Nombre");
             ViewBag.Paquetes = paquetes; // Pasar paquetes para uso en JavaScript
 
-            // Cargar los servicios disponibles con Id, Nombre y Precio
-            var servicios = await _context.Servicios
-                .Select(s => new { s.IdServicio, s.NomServicio, s.Costo })
-                .ToListAsync();
-
-            ViewBag.Servicios = servicios; // Pasar servicios a la vista
-
-            var clientes = await _context.Clientes
-                .Select(c => new { c.IdCliente, ClienteInfo = $"{c.Nombres} {c.Apellidos}" })
-                .ToListAsync();
-
-            ViewBag.IdCliente = new SelectList(clientes, "IdCliente", "ClienteInfo");
-
+        /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+        // GET: Reservas/Create
+        public IActionResult Registrar() /*--Viejo--Metodo-*/
+        {
+            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "IdCliente");
+            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "IdEstadoReserva");
+            ViewData["MetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "IdMetodoPago");
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdReserva,FechaReserva,FechaInicio,FechaFin,Subtotal,Iva,Total,NoPersonas,IdCliente,IdUsuario,IdEstadoReserva,IdMetodoPago,Descuento")] Reserva reserva, int IdPaquete, List<int> ServiciosSeleccionados)
+        public async Task<IActionResult> Registrar([Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
         {
             if (ModelState.IsValid)
             {
@@ -206,7 +204,7 @@ namespace GoldenV.Controllers
         /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
         // GET: Reservas/Edit/5
-        public async Task<IActionResult> Edit(int? id)
+        public async Task<IActionResult> Editar(int? id)/*--Viejo--Metodo-*/
         {
             if (id == null)
             {
@@ -229,7 +227,7 @@ namespace GoldenV.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
+        public async Task<IActionResult> Editar(int id, [Bind("IdReserva,IdCliente,FechaReserva,FechaInicio,FechaFinalizacion,SubTotal,Iva,Descuento,MontoTotal,MetodoPago,IdEstadoReserva")] Reserva reserva)
         {
             if (id != reserva.IdReserva)
             {
@@ -263,7 +261,7 @@ namespace GoldenV.Controllers
         }
 
         // GET: Reservas/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        public async Task<IActionResult> Eliminar(int? id)/*--Viejo--Metodo-*/
         {
             if (id == null)
             {
@@ -286,7 +284,7 @@ namespace GoldenV.Controllers
         // POST: Reservas/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> EliminacionConfirmada(int id)
         {
             var reserva = await _context.Reservas.FindAsync(id);
             if (reserva != null)
