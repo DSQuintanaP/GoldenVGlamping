@@ -13,11 +13,15 @@ namespace GoldenV.Controllers
     {
         private readonly GoldenVglampingContext _context;
 
-        public ReservasController(GoldenVglampingContext context)
+        private readonly Paquete _paquete;
+        public ReservasController(GoldenVglampingContext context, Paquete paquete)
         {
             _context = context;
+            _paquete = paquete;
         }
+        
 
+        
         // GET: Reservas
         public async Task<IActionResult> Index()
         {
@@ -133,7 +137,7 @@ namespace GoldenV.Controllers
                 .Select(p => new { p.IdPaquete, p.NomPaquete, p.Costo })
                 .ToListAsync();
 
-            ViewBag.IdPaquete = new SelectList(paquetes, "IdPaquete", "Nombre");
+            ViewBag.IdPaquete = new SelectList(paquetes, "IdPaquete", "NomPaquete");
             ViewBag.Paquetes = paquetes; // Pasar paquetes para uso en JavaScript
 
             // Cargar los servicios disponibles con Id, Nombre y Precio
@@ -154,29 +158,26 @@ namespace GoldenV.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdReserva,FechaReserva,FechaInicio,FechaFin,Subtotal,Iva,Total,NoPersonas,IdCliente,IdUsuario,IdEstadoReserva,IdMetodoPago,Descuento")] Reserva reserva, int IdPaquete, List<int> ServiciosSeleccionados)
+        public async Task<IActionResult> Create([Bind("IdReserva,FechaReserva,FechaInicio,FechaFin,Subtotal,Iva,Total,NoPersonas,IdCliente,IdUsuario,IdEstadoReserva,IdMetodoPago,Descuento")] Reserva reserva,List <int> PaquetesSeleccionados, List<int> ServiciosSeleccionados)
         {
             if (ModelState.IsValid)
             {
-                // Asignar el IdPaquete a la entidad Reserva
-                reserva.IdPaquete = IdPaquete;
-
-                // Obtener el paquete seleccionado y su precio
-                var paquete = await _context.Paquetes.FindAsync(IdPaquete);
-                if (paquete == null)
+                // Obtener los servicios seleccionados y sumar sus precios
+                decimal totalPaquetes = 0;
+                foreach (var PaqueteId in PaquetesSeleccionados)
                 {
-                    ModelState.AddModelError("IdPaquete", "El paquete seleccionado no existe.");
-                    CargarDatosVista();
-                    return View(reserva);
+                    var paquete = await _context.Paquetes.FindAsync(PaqueteId);
+                    if (paquete != null)
+                    {
+                        reserva.DetalleReservaPaquetes.Add(new DetalleReservaPaquete
+                        {
+                            IdPaquete = paquete.IdPaquete,
+                            Costo = paquete.Costo,
+                            Cantidad = 1 // Ajustar según tus necesidades
+                        });
+                        totalPaquetes += paquete.Costo;
+                    }
                 }
-
-                // Crear el detalle del paquete asociado a la reserva
-                var detallePaquete = new DetallePaquete
-                {
-                    IdPaquete = paquete.IdPaquete,
-                    Precio = paquete.Costo,
-                    Estado = true
-                };
 
                 // Obtener los servicios seleccionados y sumar sus precios
                 decimal totalServicios = 0;
@@ -185,11 +186,10 @@ namespace GoldenV.Controllers
                     var servicio = await _context.Servicios.FindAsync(servicioId);
                     if (servicio != null)
                     {
-                        reserva.DetalleServicios.Add(new DetalleServicio
+                        reserva.DetalleReservaServicios.Add(new DetalleReservaServicio
                         {
                             IdServicio = servicio.IdServicio,
-                            Precio = servicio.Costo,
-                            Estado = true,
+                            Costo = servicio.Costo,                            
                             Cantidad = 1 // Ajustar según tus necesidades
                         });
                         totalServicios += servicio.Costo;
@@ -197,13 +197,13 @@ namespace GoldenV.Controllers
                 }
 
                 // Calcular el subtotal con el precio del paquete y los servicios seleccionados
-                var subtotalConDescuento = (paquete.Costo + totalServicios) * (1 - reserva.Descuento / 100);
+                var subtotalConDescuento = (_paquete.Costo + totalServicios) * (1 - reserva.Descuento / 100);
                 reserva.SubTotal = decimal.Round(subtotalConDescuento, 2, MidpointRounding.AwayFromZero);
                 reserva.Iva = decimal.Round(reserva.SubTotal * 0.19m, 2, MidpointRounding.AwayFromZero);
                 reserva.MontoTotal = decimal.Round(reserva.SubTotal + reserva.Iva, 2, MidpointRounding.AwayFromZero);
 
                 // Agregar el detalle del paquete a la colección de DetallePaquetes de la reserva
-                reserva.DetalleReservaPaquetes.Add(detallePaquete);
+                reserva.DetalleReservaPaquetes.Add(DetalleReservaPaquete);
 
                 // Guardar la reserva junto con los detalles de paquete y servicios seleccionados
                 _context.Add(reserva);
@@ -221,16 +221,15 @@ namespace GoldenV.Controllers
         public void CargarDatosVista()
         {
             // Cargar clientes disponibles
-            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "Nombre");
+            ViewData["IdCliente"] = new SelectList(_context.Clientes, "IdCliente", "Nombres");
 
             // Cargar métodos de pago disponibles
-            ViewData["IdMetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "Nombre");
+            ViewData["IdMetodoPago"] = new SelectList(_context.MetodoPagos, "IdMetodoPago", "NomMetodoPago");
 
             // Cargar estados de reserva
-            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "Estados");
+            ViewData["IdEstadoReserva"] = new SelectList(_context.EstadosReservas, "IdEstadoReserva", "NombreEstadoReserva");
 
-            // Cargar usuarios disponibles (si es necesario)
-            ViewData["IdUsuario"] = new SelectList(_context.Usuarios, "IdUsuario", "Nombre");
+            
         }
         public async Task<IActionResult> AgregarAbono(int id)
         {
@@ -431,11 +430,11 @@ namespace GoldenV.Controllers
 
             if (reserva != null)
             {
-                var detallesPaquetes = _context.DetallePaquetes.Where(dp => dp.IdReserva == id);
-                _context.DetallePaquetes.RemoveRange(detallesPaquetes);
+                var detallesPaquetes = _context.DetalleReservaPaquetes.Where(dp => dp.IdReserva == id);
+                _context.DetalleReservaPaquetes.RemoveRange(detallesPaquetes);
 
-                var detallesServicios = _context.DetalleServicios.Where(ds => ds.IdReserva == id);
-                _context.DetalleServicios.RemoveRange(detallesServicios);
+                var detallesServicios = _context.DetalleReservaServicios.Where(ds => ds.IdReserva == id);
+                _context.DetalleReservaServicios.RemoveRange(detallesServicios);
 
                 _context.Reservas.Remove(reserva);
                 await _context.SaveChangesAsync();

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.DataAnnotations;
 
 namespace GoldenV.Models;
 
@@ -11,9 +13,9 @@ public partial class DetalleReservaServicio
 
     public int? IdReserva { get; set; }
 
-    public int? Cantidad { get; set; }
+    public int Cantidad { get; set; }
 
-    public decimal? Costo { get; set; }
+    public decimal Costo { get; set; }
 
     public virtual Reserva? IdReservaNavigation { get; set; }
 

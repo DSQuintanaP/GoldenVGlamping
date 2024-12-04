@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Mvc.DataAnnotations;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace GoldenV.Models;
 
@@ -7,22 +9,31 @@ public partial class Reserva
 {
     public int IdReserva { get; set; }
 
+    [Required]
     public int? IdCliente { get; set; }
 
-    public DateTime? FechaReserva { get; set; }
+    [Required]
+    public DateTime? FechaReserva { get; set; } = DateTime.Now;
 
+    [Required]
     public DateTime? FechaInicio { get; set; }
 
+    [Required]
     public DateTime? FechaFinalizacion { get; set; }
 
-    public decimal? SubTotal { get; set; }
+    [Required]
+    public decimal SubTotal { get; set; }
 
-    public decimal? Iva { get; set; }
+    [Required]
+    public decimal Iva { get; set; }
 
-    public decimal? Descuento { get; set; }
+    [Required]
+    public decimal Descuento { get; set; }
 
-    public decimal? MontoTotal { get; set; }
+    [Required]
+    public decimal MontoTotal { get; set; }
 
+    [Required]
     public int? MetodoPago { get; set; }
 
     public int? IdEstadoReserva { get; set; }

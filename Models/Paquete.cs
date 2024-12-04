@@ -9,7 +9,7 @@ public partial class Paquete
 
     public string? NomPaquete { get; set; }
 
-    public decimal? Costo { get; set; }
+    public decimal Costo { get; set; }
 
     public int? IdHabitacion { get; set; }
 
