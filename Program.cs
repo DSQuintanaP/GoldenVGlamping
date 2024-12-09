@@ -1,6 +1,8 @@
 using GoldenV.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.SqlServer;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 
 namespace GoldenV
 {
@@ -17,6 +19,22 @@ namespace GoldenV
 
             builder.Services.AddDbContext<GoldenVglampingContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("BloggingDatabase")));
+
+            void ConfigureServices(IServiceCollection services)
+            {
+                var mapperConfig = new MapperConfiguration(gold =>
+                {
+                    gold.AddProfile(new MappingProfile());
+                });
+                IMapper mapper = mapperConfig.CreateMapper();
+                services.AddSingleton(mapper);
+                services.AddMvc();
+            }
+
+            builder.Services.AddControllers(options =>
+            {
+                options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+            });
 
             /*-----------------------------------------------------------------------------------------------------------------------------------------------*/
 
